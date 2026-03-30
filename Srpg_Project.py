@@ -1,10 +1,12 @@
 '''
 date: 2026-03-31
-time: AM 05:14
-version 0.0.4
+time: AM 05:43
+version 0.0.5
 developer: ruan
 description: simple text-based game with python
 '''
+import json
+import os
 import random
 from copy import deepcopy
 
@@ -298,6 +300,147 @@ potion_store_items_list = list(potion_store_items.keys())
 weapon_store_items_list = list(weapon_store_items.keys())
 shoe_store_items_list = list(shoe_store_items.keys())
 enemy_drop_items_list = list(enemy_drop_items.keys())
+
+SAVE_SLOTS = 5
+SAVE_DIR = os.path.join(os.path.dirname(__file__), "saves")
+
+
+def get_save_path(slot: int) -> str:
+    return os.path.join(SAVE_DIR, f"slot_{slot}.json")
+
+
+def save_game(player, slot: int) -> None:
+    if not isinstance(slot, int) or not (1 <= slot <= SAVE_SLOTS):
+        invalid_input()
+        return
+
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    path = get_save_path(slot)
+
+    data = {
+        "name": player.name,
+        "max_health": player.max_health,
+        "health": player.health,
+        "experience": player.experience,
+        "experience_to_next_level": player.experience_to_next_level,
+        "level": player.level,
+        "strength": player.strength,
+        "defense": player.defense,
+        "coins": player.coins,
+        "location": player.location,
+        "inventory": player.inventory,
+        "slot_items": player.slot_items,
+        "attack_buff_turns": player.attack_buff_turns,
+        "attack_buff_multiplier": player.attack_buff_multiplier,
+        "saved_at": None,  # human time not required; keep file stable
+    }
+
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    print(f"세이브 완료: 슬롯 {slot}")
+
+
+def load_game_into(player, slot: int) -> bool:
+    if not isinstance(slot, int) or not (1 <= slot <= SAVE_SLOTS):
+        invalid_input()
+        return False
+
+    path = get_save_path(slot)
+    if not os.path.exists(path):
+        print("해당 슬롯에 세이브가 없습니다.")
+        return False
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        print("세이브 파일을 읽지 못했습니다. (파일 손상 여부 확인)")
+        return False
+
+    # Player를 새로 생성하지 않고, 현재 객체를 덮어써서 run_game(player) 흐름을 유지합니다.
+    player.name = data.get("name", player.name)
+    player.max_health = data.get("max_health", player.max_health)
+    player.health = data.get("health", player.health)
+    player.experience = data.get("experience", player.experience)
+    player.experience_to_next_level = data.get(
+        "experience_to_next_level", player.experience_to_next_level
+    )
+    player.level = data.get("level", player.level)
+    player.strength = data.get("strength", player.strength)
+    player.defense = data.get("defense", player.defense)
+    player.coins = data.get("coins", player.coins)
+    player.location = data.get("location", player.location)
+    player.inventory = data.get("inventory", player.inventory)
+    player.slot_items = data.get("slot_items", player.slot_items)
+    player.attack_buff_turns = data.get("attack_buff_turns", player.attack_buff_turns)
+    player.attack_buff_multiplier = data.get(
+        "attack_buff_multiplier", player.attack_buff_multiplier
+    )
+
+    player.clamp_health()
+    print(f"로드 완료: 슬롯 {slot}")
+    return True
+
+
+def enter_save_load_menu(player):
+    while True:
+        print(
+            "[세이브/로드]\n[1] [세이브]\n[2] [로드]\n[9] [마을회관으로 돌아가기]"
+        )
+        print_divider(30)
+        action = input("원하는 행동을 선택하세요: ").strip()
+        print_divider(50)
+
+        if action == "9":
+            return
+        elif action == "1":
+            print("[세이브 슬롯]")
+            for i in range(1, SAVE_SLOTS + 1):
+                path = get_save_path(i)
+                status = "저장됨" if os.path.exists(path) else "비어있음"
+                print(f"[{i}] [{status}]")
+            print_divider(30)
+            slot_choice = input("저장할 슬롯 번호를 입력하세요: ").strip()
+            print_divider(50)
+            if not slot_choice.isdigit():
+                invalid_input()
+                continue
+            slot = int(slot_choice)
+            if not (1 <= slot <= SAVE_SLOTS):
+                invalid_input()
+                continue
+
+            path = get_save_path(slot)
+            if os.path.exists(path):
+                confirm = input("[덮어쓰기] [1: 확인 / 2: 취소]: ").strip()
+                if confirm != "1":
+                    print("세이브를 취소했습니다.")
+                    continue
+
+            save_game(player, slot)
+            return
+        elif action == "2":
+            print("[로드 슬롯]")
+            for i in range(1, SAVE_SLOTS + 1):
+                path = get_save_path(i)
+                status = "저장됨" if os.path.exists(path) else "비어있음"
+                print(f"[{i}] [{status}]")
+            print_divider(30)
+            slot_choice = input("불러올 슬롯 번호를 입력하세요: ").strip()
+            print_divider(50)
+            if not slot_choice.isdigit():
+                invalid_input()
+                continue
+            slot = int(slot_choice)
+            if not (1 <= slot <= SAVE_SLOTS):
+                invalid_input()
+                continue
+
+            if load_game_into(player, slot):
+                return
+        else:
+            invalid_input()
 
 
 def invalid_input():
@@ -657,7 +800,15 @@ def enter_hospital(player):
 
 
 def enter_village_hall(player):
-    print("[마을회관]\n[1] [스테이터스 확인]\n[2] [인벤토리 확인]\n[3] [장비 확인]\n[4] [장비 교체]\n[9] [마을 중심으로 돌아가기]")
+    print(
+        "[마을회관]\n"
+        "[1] [스테이터스 확인]\n"
+        "[2] [인벤토리 확인]\n"
+        "[3] [장비 확인]\n"
+        "[4] [장비 교체]\n"
+        "[5] [세이브/로드]\n"
+        "[9] [마을 중심으로 돌아가기]"
+    )
     print_divider(30)
     action = input("원하는 행동을 선택하세요: ").strip()
     print_divider(50)
@@ -669,6 +820,8 @@ def enter_village_hall(player):
         player.show_equipment()
     elif action == "4":
         open_equipment_menu(player)
+    elif action == "5":
+        enter_save_load_menu(player)
     elif action == "9":
         player.go_to("마을 중심", 0)
     else:

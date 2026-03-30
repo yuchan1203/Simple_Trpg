@@ -1,0 +1,9 @@
+## Python caches / build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+## Game save files (JSON)
+saves/
+
