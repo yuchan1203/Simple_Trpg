@@ -1,14 +1,22 @@
 '''
 date: 2026-03-31
-time: AM 05:43
-version 0.0.5
+time: AM 07:09
+version 0.0.6
 developer: ruan
 description: simple text-based game with python
 '''
 import json
 import os
 import random
+import pygame
 from copy import deepcopy
+
+try:
+    pygame.mixer.init()
+except pygame.error:
+    # 오디오 장치가 없어도 게임이 멈추지 않도록 합니다.
+    pass
+
 
 class Player:
     def __init__(self, name):
@@ -69,6 +77,7 @@ class Player:
     def check_level_up(self):
         while self.experience >= self.experience_to_next_level:
             print(f"레벨업! 레벨 {self.level} -> {self.level + 1}")
+            play_effect_sound("level up")
             self.experience -= self.experience_to_next_level
             self.experience_to_next_level += self.level
             self.level += 1
@@ -206,6 +215,7 @@ class Player:
             self.coins -= cost
             self.add_inventory_item(item_name)
             print(f"{item_name}을(를) 구매했습니다. 남은 코인: {self.coins}")
+            play_effect_sound("item purchase")
         else:
             print(f"코인이 부족합니다. 현재 코인: {self.coins}")
 
@@ -290,6 +300,49 @@ shoe_store_items = {
     "소형 사슬 신발": {"cost": 15, "effect": 30, "type": "shoe"},
     "사슬 신발": {"cost": 20, "effect": 40, "type": "shoe"},
 }
+
+# 효과음 딕셔너리 (파일 이름만 저장)
+effect_sounds = {
+    "heal potion": "#증가 #점수 #스탯 #코인.mp3",
+    "attack potion": "#증가 #점수 #스탯 #코인.mp3",
+    "weapon": "",
+    "shield": "",
+    "shoe": "",
+    "attack": "#펀치 #때림 #공격 #주먹.mp3",
+    "defense": "",
+    "critical": "",
+    "dodge": "",
+    "coin": "",
+    "level up": "#포인트 #능력치 #성장 #증가.mp3",
+    "level down": "",
+    "death": "",
+    "escape": "",
+    "victory": "",
+    "defeat": "",
+    "item purchase": "#경험치 #스탯 #포인트 #작게.mp3",
+    "item sell": "",
+    "item use": "",
+}
+
+EFFECT_SOUND_DIR = os.path.join(os.path.dirname(__file__), "effect_sound")
+
+
+def play_effect_sound(key: str) -> None:
+    """효과음을 안전하게 재생합니다."""
+    filename = effect_sounds.get(key)
+    if not filename:
+        return
+    if not hasattr(pygame, "mixer") or not pygame.mixer.get_init():
+        return
+    sound_path = os.path.join(EFFECT_SOUND_DIR, filename)
+    if not os.path.exists(sound_path):
+        return
+    try:
+        pygame.mixer.Sound(sound_path).play()
+    except pygame.error:
+        # 사운드 재생 오류가 나도 게임은 계속 진행
+        pass
+
 store_items = {}
 store_items.update({item: weapon_store_items[item] for item in weapon_store_items})
 store_items.update({item: potion_store_items[item] for item in potion_store_items})
@@ -486,6 +539,7 @@ def use_item(player, item_name):
                 print("아이템 사용을 취소했습니다.")
                 return False
         print("체력을 성공적으로 회복하였습니다!", end=" ")
+        play_effect_sound("heal potion")
         player.recover_health(item_data["effect"], 0)
     elif item_data["type"] == "attack potion":
         choice = input(
@@ -496,6 +550,7 @@ def use_item(player, item_name):
             print("아이템 사용을 취소했습니다.")
             return False
         player.apply_attack_buff(item_data["effect"], item_data["effect2"])
+        play_effect_sound("attack potion")
         print(
             f"공격 포션을 성공적으로 사용하였습니다! 앞으로 {item_data['effect2']}턴 동안 공격력이 {item_data['effect']}배 증가합니다."
         )
@@ -602,6 +657,7 @@ def run_battle(player, enemy):
             damage = player.get_total_attack() + random.randint(0, player.level)
             enemy.take_damage(damage)
             print(f"당신이 적에게 {damage}의 피해를 입혔습니다. 적의 남은 체력: {enemy.health}")
+            play_effect_sound("attack")
         elif action == "2" and can_parry:
             defense = min(player.get_total_defense(), 100)
             print(
