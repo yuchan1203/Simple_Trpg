@@ -1,8 +1,8 @@
-﻿'''
+'''
 date: 2026-03-31
-version 0.0.2
+version 0.0.3
 developer: ruan
-discription: simple text-based game with python
+description: simple text-based game with python
 '''
 import random
 from copy import deepcopy
@@ -256,12 +256,12 @@ DEFAULT_SLOT_ITEMS = {
 enemy_types = {
     "슬라임": {"health": 30, "damage": 10, "item": "슬라임의 이슬"},
     "고블린": {"health": 60, "damage": 15, "item": "고블린의 칼"},
-    "오크": {"health": 100, "damage": 20, "item": "미스터리 아이템"},
+    "오크": {"health": 100, "damage": 20, "item": "오크의 살점"},
 }
 enemy_drop_items = {
     "슬라임의 이슬": {"cost": 5, "effect": 10, "type": "heal potion"},
     "고블린의 칼": {"cost": 10, "effect": 19, "type": "weapon"},
-    "미스터리 아이템": {"cost": 20, "effect": "랜덤 효과", "type": "mystery"},
+    "오크의 살점": {"cost": 20, "effect": 2, "type": "attack potion"},
 }
 potion_store_items = {
     "소형 체력 포션": {"cost": 5, "effect": 25, "type": "heal potion"},
@@ -298,8 +298,6 @@ weapon_store_items_list = list(weapon_store_items.keys())
 shoe_store_items_list = list(shoe_store_items.keys())
 enemy_drop_items_list = list(enemy_drop_items.keys())
 
-player = None
-
 
 def invalid_input():
     print("잘못된 입력입니다. 다시 시도해 주세요.")
@@ -311,58 +309,14 @@ def print_divider(separator_length):
     print("-" * separator_length)
 
 
-def show_hp():
-    player.show_hp()
-
-
-def show_experience():
-    player.show_experience()
-
-
-def show_status():
-    player.show_status()
-
-
-def show_inventory():
-    player.show_inventory()
-
-
-def show_equipment():
-    player.show_equipment()
-
-
-def go_to(location, down_health):
-    player.go_to(location, down_health)
-
-
-def add_inventory_item(item_name, quantity=1):
-    player.add_inventory_item(item_name, quantity)
-
-
-def remove_item(item_name, quantity=1):
-    player.remove_inventory_item(item_name, quantity)
-
-
-def purchase_item(item_name, cost):
-    player.purchase_item(item_name, cost)
-
-
-def sell_inventory_item(item_name, cost, quantity=1):
-    player.sell_inventory_item(item_name, cost, quantity)
-
-
-def has_sellable_items():
+def has_sellable_items(player):
     if player.inventory:
         print("[1] [아이템 판매]")
         return True
     return False
 
 
-def recover_health(healing_amount, cost):
-    player.recover_health(healing_amount, cost)
-
-
-def get_usable_battle_items():
+def get_usable_battle_items(player):
     usable_types = {"heal potion", "attack potion"}
     return [
         item_name
@@ -371,7 +325,7 @@ def get_usable_battle_items():
     ]
 
 
-def use_item(item_name):
+def use_item(player, item_name):
     if item_name not in player.inventory or player.inventory[item_name] <= 0:
         invalid_input()
         return False
@@ -382,17 +336,17 @@ def use_item(item_name):
         if player.health + item_data["effect"] >= player.max_health:
             choice = input(
                 f"체력이 최대 체력을 초과하게 됩니다. [체력: {player.health}] [최대 체력: {player.max_health}] "
-                f"[회복량: {item_data['effect']}] 아이템을 사용할까요? (y:1/n:2)"
+                f"[회복량: {item_data['effect']}] [1: 아이템 사용] [2: 취소]"
             ).strip()
             if choice != "1":
                 print("아이템 사용을 취소했습니다.")
                 return False
         print("체력을 성공적으로 회복하였습니다!", end=" ")
-        recover_health(item_data["effect"], 0)
+        player.recover_health(item_data["effect"], 0)
     elif item_data["type"] == "attack potion":
         choice = input(
             f"공격력을 증가시키겠습니까? [현재 공격력: {player.get_total_attack()}] "
-            f"[증가 배율: {item_data['effect']}] [Y:1 / N:2]: "
+            f"[증가 배율: {item_data['effect']}] [1: 아이템 사용] [2: 취소]: "
         ).strip()
         if choice != "1":
             print("아이템 사용을 취소했습니다.")
@@ -409,7 +363,7 @@ def use_item(item_name):
     return True
 
 
-def open_equipment_menu():
+def open_equipment_menu(player):
     while True:
         slot_names = list(player.slot_items.keys())
         for idx, slot in enumerate(slot_names, 1):
@@ -422,7 +376,7 @@ def open_equipment_menu():
         slot_choice = input("장비를 관리할 슬롯을 선택하세요: ").strip()
         print_divider(50)
         if slot_choice == "9":
-            go_to("마을회관", 0)
+            player.go_to("마을회관", 0)
             return
         elif not slot_choice.isdigit() or not (1 <= int(slot_choice) <= len(slot_names)):
             invalid_input()
@@ -458,7 +412,7 @@ def open_equipment_menu():
             player.unequip_item(selected_slot)
             return
         if action == "9":
-            go_to("마을회관", 0)
+            player.go_to("마을회관", 0)
             return
         if can_equip and action.isdigit():
             action_num = int(action)
@@ -470,13 +424,13 @@ def open_equipment_menu():
         invalid_input()
 
 
-def begin_battle(enemy_type):
+def begin_battle(player, enemy_type):
     enemy = Enemy.from_type(enemy_type)
     print(f"{enemy.name}(이)가 나타났습니다! 전투를 시작합니다.")
-    run_battle(enemy)
+    run_battle(player, enemy)
 
 
-def run_battle(enemy):
+def run_battle(player, enemy):
     defense_active = False
     stunned = False
 
@@ -484,7 +438,7 @@ def run_battle(enemy):
         print_divider(30)
         can_attack = player.slot_items["무기 슬롯"]["name"] != ""
         can_parry = player.slot_items["방패 슬롯"]["name"] != ""
-        usable_inventory_items = get_usable_battle_items()
+        usable_inventory_items = get_usable_battle_items(player)
         can_use_item = bool(usable_inventory_items)
         buff_applied_this_turn = False
 
@@ -517,7 +471,7 @@ def run_battle(enemy):
             print_divider(30)
             if item_choice.isdigit() and 1 <= int(item_choice) <= len(usable_inventory_items):
                 selected_item = usable_inventory_items[int(item_choice) - 1]
-                if not use_item(selected_item):
+                if not use_item(player, selected_item):
                     continue
                 buff_applied_this_turn = store_items[selected_item]["type"] == "attack potion"
             else:
@@ -535,7 +489,7 @@ def run_battle(enemy):
                 print("마을로 이동합니다..")
                 if player.attack_buff_turns > 0 and not buff_applied_this_turn:
                     player.tick_attack_buff()
-                go_to("마을 중심", 1)
+                player.go_to("마을 중심", 1)
                 return
             else:
                 print("도망치기는 실패했습니다! 적이 당신을 공격합니다.")
@@ -567,7 +521,7 @@ def run_battle(enemy):
 
         player.take_damage(enemy_damage)
         print(f"적이 당신에게 {enemy_damage}의 피해를 입혔습니다.")
-        show_hp()
+        player.show_hp()
 
     if enemy.health <= 0 and player.health > 0:
         player.add_inventory_item(enemy.drop_item)
@@ -575,28 +529,28 @@ def run_battle(enemy):
         print_divider(30)
         player.experience += 1
         player.check_level_up()
-        show_status()
+        player.show_status()
     elif player.health <= 0:
         print("패배했습니다... 다음에는 더 강해져서 도전해 주세요.")
 
 
-def enter_main_village():
+def enter_main_village(player):
     print("[마을 중심]\n[1] [마을회관으로 이동]\n[4] [물약 상점으로 이동]\n[5] [무기 상점으로 이동]\n[6] [시장으로 이동]\n[7] [병원으로 이동]\n[8] [숲으로 이동]\n[9] [게임 종료]")
     print_divider(30)
     action = input("원하는 행동을 선택하세요: ").strip()
     print_divider(50)
     if action == "1":
-        go_to("마을회관", 0)
+        player.go_to("마을회관", 0)
     elif action == "4":
-        go_to("물약 상점", 0)
+        player.go_to("물약 상점", 0)
     elif action == "5":
-        go_to("무기 상점", 0)
+        player.go_to("무기 상점", 0)
     elif action == "6":
-        go_to("시장", 0)
+        player.go_to("시장", 0)
     elif action == "7":
-        go_to("병원", 0)
+        player.go_to("병원", 0)
     elif action == "8":
-        go_to("숲", 1)
+        player.go_to("숲", 1)
     elif action == "9":
         print("게임이 종료되었습니다.")
         exit()
@@ -604,20 +558,20 @@ def enter_main_village():
         invalid_input()
 
 
-def enter_forest():
+def enter_forest(player):
     print("[숲] [1: 전투 시작] [9: 마을 중심으로 돌아가기]")
     print_divider(30)
     action = input("원하는 행동을 선택하세요: ").strip()
     print_divider(50)
     if action == "1":
-        begin_battle("슬라임")
+        begin_battle(player, "슬라임")
     elif action == "9":
-        go_to("마을 중심", 1)
+        player.go_to("마을 중심", 1)
     else:
         invalid_input()
 
 
-def enter_potion_store():
+def enter_potion_store(player):
     print("[물약 상점]")
     for idx, item in enumerate(potion_store_items_list, 1):
         print(f"[{idx}] [{item} 구매하기] [{potion_store_items[item]['cost']} 코인]")
@@ -628,14 +582,14 @@ def enter_potion_store():
     if action.isdigit() and 1 <= int(action) <= len(potion_store_items_list):
         current_item_name = potion_store_items_list[int(action) - 1]
         current_item_cost = potion_store_items[current_item_name]["cost"]
-        purchase_item(current_item_name, current_item_cost)
+        player.purchase_item(current_item_name, current_item_cost)
     elif action == "9":
-        go_to("마을 중심", 0)
+        player.go_to("마을 중심", 0)
     else:
         invalid_input()
 
 
-def enter_weapon_store():
+def enter_weapon_store(player):
     print("[무기 상점]")
     for idx, item in enumerate(weapon_store_items_list, 1):
         print(f"[{idx}] [{item} 구매하기] [{weapon_store_items[item]['cost']} 코인]")
@@ -646,16 +600,16 @@ def enter_weapon_store():
     if action.isdigit() and 1 <= int(action) <= len(weapon_store_items_list):
         current_item_name = weapon_store_items_list[int(action) - 1]
         current_item_cost = weapon_store_items[current_item_name]["cost"]
-        purchase_item(current_item_name, current_item_cost)
+        player.purchase_item(current_item_name, current_item_cost)
     elif action == "9":
-        go_to("마을 중심", 0)
+        player.go_to("마을 중심", 0)
     else:
         invalid_input()
 
 
-def enter_market():
+def enter_market(player):
     print("[시장]", end=" ")
-    can_sell = has_sellable_items()
+    can_sell = has_sellable_items(player)
     print("[9] [마을 중심으로 돌아가기]")
     print_divider(30)
     action = input("원하는 행동을 선택하세요: ").strip()
@@ -669,20 +623,20 @@ def enter_market():
         print_divider(50)
         if item_choice.isdigit() and 1 <= int(item_choice) <= len(inventory_items):
             selected_item = inventory_items[int(item_choice) - 1]
-            sell_inventory_item(selected_item, 5, 1)
+            player.sell_inventory_item(selected_item, 5, 1)
         elif item_choice == "9":
             print("판매를 취소했습니다.")
         else:
             invalid_input()
     elif action == "9":
-        go_to("마을 중심", 0)
+        player.go_to("마을 중심", 0)
     else:
         invalid_input()
 
 
-def enter_hospital():
+def enter_hospital(player):
     print("[병원]")
-    show_hp()
+    player.show_hp()
     can_recover = player.health < player.max_health
     if can_recover:
         print("[1] [체력 10 회복하기] [1 코인]")
@@ -692,65 +646,51 @@ def enter_hospital():
     action = input("원하는 행동을 선택하세요: ").strip()
     print_divider(50)
     if action == "1":
-        recover_health(10, 1)
+        player.recover_health(10, 1)
     elif action == "2":
-        recover_health(player.max_health - player.health, 3)
+        player.recover_health(player.max_health - player.health, 3)
     elif action == "9":
-        go_to("마을 중심", 0)
+        player.go_to("마을 중심", 0)
     else:
         invalid_input()
 
 
-def enter_village_hall():
+def enter_village_hall(player):
     print("[마을회관]\n[1] [스테이터스 확인]\n[2] [인벤토리 확인]\n[3] [장비 확인]\n[4] [장비 교체]\n[9] [마을 중심으로 돌아가기]")
     print_divider(30)
     action = input("원하는 행동을 선택하세요: ").strip()
     print_divider(50)
     if action == "1":
-        show_status()
+        player.show_status()
     elif action == "2":
-        show_inventory()
+        player.show_inventory()
     elif action == "3":
-        show_equipment()
+        player.show_equipment()
     elif action == "4":
-        open_equipment_menu()
+        open_equipment_menu(player)
     elif action == "9":
-        go_to("마을 중심", 0)
+        player.go_to("마을 중심", 0)
     else:
         invalid_input()
 
 
-def main():
-    global player
-
-    player_name = input("플레이어 이름을 입력하세요: ")
-    player = Player(player_name)
-    print_divider(50)
-    if player_name == "admin":
-        print("관리자 모드로 진입합니다. 최대 체력을 부여합니다.")
-        player.max_health = 1000
-        player.health = 1000
-        player.experience = 50
-        player.coins = 1000
-    else:
-        print(f"안녕하세요 {player_name}님, 게임의 세계에 오신 것을 환영합니다. 당신은 이 세계를 구하기 위해 모험을 떠납니다.")
-
+def run_game(player):
     while True:
         print_divider(30)
         if player.location == "마을 중심":
-            enter_main_village()
+            enter_main_village(player)
         elif player.location == "숲":
-            enter_forest()
+            enter_forest(player)
         elif player.location == "물약 상점":
-            enter_potion_store()
+            enter_potion_store(player)
         elif player.location == "무기 상점":
-            enter_weapon_store()
+            enter_weapon_store(player)
         elif player.location == "시장":
-            enter_market()
+            enter_market(player)
         elif player.location == "병원":
-            enter_hospital()
+            enter_hospital(player)
         elif player.location == "마을회관":
-            enter_village_hall()
+            enter_village_hall(player)
         else:
             print("알 수 없는 위치입니다. 마을 중심으로 이동합니다.")
             player.location = "마을 중심"
@@ -758,6 +698,24 @@ def main():
         if player.health <= 0:
             print("게임 오버! 다음에는 더 강해져서 도전해 주세요.")
             break
+
+
+def main():
+    player_name = input("플레이어 이름을 입력하세요: ")
+    player = Player(player_name)
+    print_divider(50)
+    if player_name == "admin":  # admin mode
+        print("관리자 모드로 진입합니다. 최대 체력을 부여합니다.")
+        player.max_health = 1000
+        player.health = 1000
+        player.experience = 50
+        player.coins = 1000
+    else:
+        print(
+            f"안녕하세요 {player_name}님, 게임의 세계에 오신 것을 환영합니다. 당신은 이 세계를 구하기 위해 모험을 떠납니다."
+        )
+
+    run_game(player)
 
 
 if __name__ == "__main__":
