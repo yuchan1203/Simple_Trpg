@@ -1,6 +1,7 @@
 '''
 date: 2026-03-31
-version 0.0.3
+time: AM 05:14
+version 0.0.4
 developer: ruan
 description: simple text-based game with python
 '''
