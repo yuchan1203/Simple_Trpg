@@ -1,7 +1,7 @@
 '''
 date: 2026-03-31
-time: PM 03:31
-version 0.0.8
+time: PM 04:53
+version 0.0.9
 developer: ruan
 description: simple text-based game with python
 '''
@@ -13,7 +13,7 @@ import pygame
 import time
 from copy import deepcopy
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any, Dict
 
 try:
     pygame.mixer.init()
@@ -24,12 +24,11 @@ class Storymanager:
     def __init__(self, player):
         self.player = player
     def typewriter_print(self, text, delay=0.05):
-        # 스토리(타자) 출력 구간에서만 배경음(설명음) 재생
         play_bgm("Story_explain", volume=0.35)
         for char in text:
             print(char, end="", flush=True)
             time.sleep(delay)
-        print()  # 줄바꿈
+        print()
         stop_bgm()
     def start_prologue(self):
         self.typewriter_print(story["prologue"])
@@ -46,7 +45,6 @@ class Player:
         self.defense = 1
         self.coins = 100
         self.location = "마을 중심"
-        # 스토리 진행도(간단 매핑: 현재는 location/초기 경험치 기반)
         self.story_progress = "prologue"
         self.inventory = {}
         self.slot_items = deepcopy(DEFAULT_SLOT_ITEMS)
@@ -94,8 +92,8 @@ class Player:
 
     def check_level_up(self):
         while self.experience >= self.experience_to_next_level:
+            play_effect_sound("레벨_업")
             print(f"레벨업! 레벨 {self.level} -> {self.level + 1}")
-            play_effect_sound("레벨업")
             self.experience -= self.experience_to_next_level
             self.experience_to_next_level += self.level
             self.level += 1
@@ -116,6 +114,7 @@ class Player:
 
     def go_to(self, location, down_health):
         if self.health <= down_health:
+            play_effect_sound("오류_메시지")
             print(f"체력이 {down_health} 이하라 이동할 수 없습니다.")
             self.show_hp()
             return
@@ -160,6 +159,7 @@ class Player:
         print(f"[LV.{self.level}] [EXP {self.experience}/{self.experience_to_next_level}] {exp_bar}")
 
     def show_status(self):
+        play_effect_sound("현재 스탯 표시")
         self.show_hp()
         self.show_experience()
         status_parts = [
@@ -194,6 +194,7 @@ class Player:
             invalid_input()
             return False
         item_name = self.slot_items[slot]["name"]
+        play_effect_sound("장비_교체")
         print(f"{item_name}을(를) {slot}에서 해제했습니다.")
         self.add_inventory_item(item_name)
         self.slot_items[slot]["name"] = ""
@@ -209,6 +210,7 @@ class Player:
         self.slot_items[slot]["name"] = item_name
         self.slot_items[slot]["effect"] = store_items[item_name]["effect"]
         self.remove_inventory_item(item_name)
+        play_effect_sound("장비_교체")
         print(f"{item_name}을(를) {slot}에 장착했습니다.")
         return True
 
@@ -229,6 +231,7 @@ class Player:
             self.show_hp()
 
     def purchase_item(self, item_name, cost):
+        play_effect_sound("아이템 구매")
         if self.coins >= cost:
             self.coins -= cost
             self.add_inventory_item(item_name)
@@ -244,6 +247,7 @@ class Player:
         self.coins += cost * quantity
         self.remove_inventory_item(item_name, quantity)
         print(f"{item_name}을(를) 판매했습니다. 현재 코인: {self.coins}")
+        play_effect_sound("아이템 판매")
 
 
 class Enemy:
@@ -273,7 +277,6 @@ class Enemy:
         return self.health > 0
 
 
-# 현재 상태 정의
 DEFAULT_SLOT_ITEMS = {
     "무기 슬롯": {"name": "소형 나무 검", "effect": 5},
     "방패 슬롯": {"name": "소형 나무 방패", "effect": 10},
@@ -319,25 +322,27 @@ shoe_store_items = {
     "사슬 신발": {"cost": 20, "effect": 40, "type": "shoe"},
 }
 
-# 효과음 딕셔너리 (한글 key 기준)
 effect_sounds = {
-    "공격": "Slime_attack.mp3",
-    "코인 획득": "Gain_coins.mp3",
-    "레벨업": "Level_up.mp3",
-    "게임오버": "Game_over.mp3",
-    "게임클리어": "Game_clear.mp3",
-    "점프": "Player_jump.mp3",
-    "보스 조우": "Meet_boss.mp3",
-    "장비 교체": "Change_equipment.mp3",
-    "오류": "Error_message.mp3",
-    # 현재 코드상 별도 전용 효과음이 없어도, 존재하는 파일로 매핑
+    "주먹_공격": "Slime_attack.mp3",
+    "코인_획득": "Gain_coins.mp3",
     "아이템 구매": "Gain_coins.mp3",
-    "회복 포션": "Gain_coins.mp3",
-    "공격 포션": "Change_equipment.mp3",
+    "아이템_구매": "Gain_coins.mp3",
+    "아이템 판매": "Gain_coins.mp3",
+    "레벨_업": "Level_up.mp3",
+    "게임_오버": "Game_over.mp3",
+    "게임 클리어": "Game_clear.mp3",
+    "게임_클리어": "Game_clear.mp3",
+    "점프_이동": "Player_jump.mp3",
+    "보스_조우": "Meet_boss.mp3",
+    "현재 스탯 표시": "Show_status.mp3",
+    "스탯_표시": "Show_status.mp3",
+    "장비_교체": "Change_equipment.mp3",
+    "오류_메시지": "Error_message.mp3",
+    "회복_포션": "Gain_coins.mp3",
+    "공격_포션": "Change_equipment.mp3",
 }
 
 
-# 배경음악 딕셔너리
 background_music = {
     "Battle_easy": "Battle_easy.mp3",
     "Story_explain": "Story_explain.mp3",
@@ -345,7 +350,6 @@ background_music = {
 }
 
 
-# 스토리 딕셔너리
 story = {
     "prologue": "어느 날, 평화로운 마을에 어둠이 드리워졌습니다. 당신은 용감한 모험가로서 마을을 구하기 위해 여정을 떠납니다.",
     "village": "마을 중심에는 상점과 주민들이 모여 있습니다. 상점에서는 다양한 아이템을 구매할 수 있고, 주민들은 유용한 정보를 제공할 수 있습니다.",
@@ -356,6 +360,10 @@ story = {
 
 EFFECT_SOUND_DIR = os.path.join(os.path.dirname(__file__), "effect_sound")
 BGM_DIR = os.path.join(os.path.dirname(__file__), "bgm")
+
+CURRENT_BGM_KEY: Optional[str] = None
+
+EFFECT_SOUND_CACHE: Dict[str, Any] = {}
 
 
 def play_effect_sound(key: str) -> None:
@@ -369,13 +377,18 @@ def play_effect_sound(key: str) -> None:
     if not os.path.exists(sound_path):
         return
     try:
-        pygame.mixer.Sound(sound_path).play()
+        cached_sound = EFFECT_SOUND_CACHE.get(sound_path)
+        if cached_sound is None:
+            cached_sound = pygame.mixer.Sound(sound_path)
+            EFFECT_SOUND_CACHE[sound_path] = cached_sound
+        cached_sound.play()
     except pygame.error:
         pass
 
 
 def play_bgm(key: str, *, loops: int = -1, volume: float = 0.5) -> None:
     """배경음악을 안전하게 재생합니다."""
+    global CURRENT_BGM_KEY
     filename = background_music.get(key)
     if not filename:
         return
@@ -384,10 +397,18 @@ def play_bgm(key: str, *, loops: int = -1, volume: float = 0.5) -> None:
     music_path = os.path.join(BGM_DIR, filename)
     if not os.path.exists(music_path):
         return
+    volume = max(0.0, min(1.0, volume))
     try:
+        if CURRENT_BGM_KEY == key:
+            pygame.mixer.music.set_volume(volume)
+            if not pygame.mixer.music.get_busy():
+                pygame.mixer.music.play(loops=loops)
+            return
+
         pygame.mixer.music.load(music_path)
-        pygame.mixer.music.set_volume(max(0.0, min(1.0, volume)))
+        pygame.mixer.music.set_volume(volume)
         pygame.mixer.music.play(loops=loops)
+        CURRENT_BGM_KEY = key
     except pygame.error:
         pass
 
@@ -399,6 +420,8 @@ def stop_bgm() -> None:
         pygame.mixer.music.stop()
     except pygame.error:
         pass
+    global CURRENT_BGM_KEY
+    CURRENT_BGM_KEY = None
 
 store_items = {}
 store_items.update({item: weapon_store_items[item] for item in weapon_store_items})
@@ -465,7 +488,7 @@ def get_save_saved_at(slot: int) -> Optional[str]:
 
 
 def get_save_slot_summary(slot: int) -> Optional[dict]:
-    """세이브 슬롯 정보(저장시간/경험치/스토리 진행도)를 안전하게 읽습니다."""
+    """세이브 슬롯 정보(저장시간/경험치/스토리 진행도/플레이어 이름)를 안전하게 읽습니다."""
     path = get_save_path(slot)
     if not os.path.exists(path):
         return None
@@ -476,6 +499,7 @@ def get_save_slot_summary(slot: int) -> Optional[dict]:
         return None
 
     saved_at = data.get("saved_at")
+    name = data.get("name")
     experience = data.get("experience")
 
     progress_key = data.get("story_progress")
@@ -486,6 +510,7 @@ def get_save_slot_summary(slot: int) -> Optional[dict]:
 
     return {
         "saved_at": saved_at,
+        "name": name,
         "experience": experience,
         "story_progress": progress_key,
     }
@@ -532,7 +557,10 @@ def load_game_into(player, slot: int) -> bool:
     path = get_save_path(slot)
     if not os.path.exists(path):
         print("해당 슬롯에 세이브가 없습니다.")
+        print_divider(30)
+        play_effect_sound("오류_메시지")
         return False
+
 
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -586,12 +614,13 @@ def enter_save_load_menu(player):
                     continue
                 summary = get_save_slot_summary(i) or {}
                 saved_at = summary.get("saved_at") or "알 수 없음"
+                player_name = summary.get("name") or "알 수 없음"
                 experience = summary.get("experience")
                 exp_text = str(experience) if experience is not None else "알 수 없음"
                 progress_key = summary.get("story_progress", "unknown")
                 progress_text = story_progress_label(progress_key)
                 print(
-                    f"[{i}] [저장됨: {saved_at}] [EXP: {exp_text}] [스토리: {progress_text}]"
+                    f"[{i}] [저장됨: {saved_at}] [이름: {player_name}] [EXP: {exp_text}] [스토리: {progress_text}]"
                 )
             print_divider(30)
             slot_choice = input("저장할 슬롯 번호를 입력하세요: ").strip()
@@ -622,12 +651,13 @@ def enter_save_load_menu(player):
                     continue
                 summary = get_save_slot_summary(i) or {}
                 saved_at = summary.get("saved_at") or "알 수 없음"
+                player_name = summary.get("name") or "알 수 없음"
                 experience = summary.get("experience")
                 exp_text = str(experience) if experience is not None else "알 수 없음"
                 progress_key = summary.get("story_progress", "unknown")
                 progress_text = story_progress_label(progress_key)
                 print(
-                    f"[{i}] [저장됨: {saved_at}] [EXP: {exp_text}] [스토리: {progress_text}]"
+                    f"[{i}] [저장됨: {saved_at}] [이름: {player_name}] [EXP: {exp_text}] [스토리: {progress_text}]"
                 )
             print_divider(30)
             slot_choice = input("불러올 슬롯 번호를 입력하세요: ").strip()
@@ -647,6 +677,7 @@ def enter_save_load_menu(player):
 
 
 def invalid_input():
+    play_effect_sound("오류_메시지")
     print("잘못된 입력입니다. 다시 시도해 주세요.")
 
 
@@ -689,7 +720,7 @@ def use_item(player, item_name):
                 print("아이템 사용을 취소했습니다.")
                 return False
         print("체력을 성공적으로 회복하였습니다!", end=" ")
-        play_effect_sound("회복 포션")
+        play_effect_sound("회복_포션")
         player.recover_health(item_data["effect"], 0)
     elif item_data["type"] == "attack potion":
         choice = input(
@@ -700,7 +731,7 @@ def use_item(player, item_name):
             print("아이템 사용을 취소했습니다.")
             return False
         player.apply_attack_buff(item_data["effect"], item_data["effect2"])
-        play_effect_sound("공격 포션")
+        play_effect_sound("공격_포션")
         print(
             f"공격 포션을 성공적으로 사용하였습니다! 앞으로 {item_data['effect2']}턴 동안 공격력이 {item_data['effect']}배 증가합니다."
         )
@@ -808,7 +839,7 @@ def run_battle(player, enemy):
             damage = player.get_total_attack() + random.randint(0, player.level)
             enemy.take_damage(damage)
             print(f"당신이 적에게 {damage}의 피해를 입혔습니다. 적의 남은 체력: {enemy.health}")
-            play_effect_sound("공격")
+
         elif action == "2" and can_parry:
             defense = min(player.get_total_defense(), 100)
             print(
@@ -840,10 +871,12 @@ def run_battle(player, enemy):
                 print("마을로 이동합니다..")
                 if player.attack_buff_turns > 0 and not buff_applied_this_turn:
                     player.tick_attack_buff()
+                stop_bgm()
                 player.go_to("마을 중심", 1)
                 return
             else:
                 print("도망치기는 실패했습니다! 적이 당신을 공격합니다.")
+                play_effect_sound("주먹_공격")
         else:
             invalid_input()
             continue
@@ -872,6 +905,7 @@ def run_battle(player, enemy):
 
         player.take_damage(enemy_damage)
         print(f"적이 당신에게 {enemy_damage}의 피해를 입혔습니다.")
+        play_effect_sound("주먹_공격")
         player.show_hp()
 
     if enemy.health <= 0 and player.health > 0:
@@ -884,7 +918,6 @@ def run_battle(player, enemy):
         player.show_status()
     elif player.health <= 0:
         stop_bgm()
-        print("패배했습니다... 다음에는 더 강해져서 도전해 주세요.")
 
 
 def enter_main_village(player):
@@ -1041,10 +1074,23 @@ def enter_village_hall(player):
         invalid_input()
 
 
+def sync_bgm_with_location(location: str) -> None:
+    """
+    현재 위치에 맞춰 BGM을 명확히 동기화합니다.
+    - 마을 중심: Village_toun
+    - 그 외: BGM 정지
+    """
+    if location == "마을 중심":
+        play_bgm("Village_toun", volume=0.35)
+    else:
+        stop_bgm()
+
+
 def run_game(player):
-    # 기본: 마을 BGM
-    play_bgm("Village_toun", volume=0.35)
     while True:
+
+        sync_bgm_with_location(player.location)
+
         print_divider(30)
         if player.location == "마을 중심":
             enter_main_village(player)
@@ -1063,9 +1109,14 @@ def run_game(player):
         else:
             print("알 수 없는 위치입니다. 마을 중심으로 이동합니다.")
             player.location = "마을 중심"
+            play_effect_sound("오류_메세지")
 
         if player.health <= 0:
+            print_divider(30)
             print("게임 오버! 다음에는 더 강해져서 도전해 주세요.")
+            play_effect_sound("게임_오버")
+            print_divider(30)
+            a = input(f"[엔터 키를 눌러 종료]")
             break
 
 
@@ -1088,7 +1139,7 @@ def main():
             player_name = input("플레이어 이름을 입력하세요: ")
             player = Player(player_name)
             print_divider(50)
-            if player_name == "admin":  # admin mode
+            if player_name == "admin":
                 print("관리자 모드로 진입합니다. 최대 코인을 부여합니다.")
                 player.coins = 1000
             else:
@@ -1096,9 +1147,9 @@ def main():
                     f"안녕하세요 {player_name}님, 게임의 세계에 오신 것을 환영합니다. 당신은 이 세계를 구하기 위해 모험을 떠납니다."
                 )
 
-            # 새 게임이면 프롤로그 출력
             story_manager = Storymanager(player)
             story_manager.start_prologue()
+            a = input(f"[엔터 키를 눌러 계속]")
             run_game(player)
             return
 
@@ -1118,6 +1169,7 @@ def main():
                 print(
                     f"[{i}] [저장됨: {saved_at}] [EXP: {exp_text}] [스토리: {progress_text}]"
                 )
+                
 
             print_divider(30)
             slot_choice = input("불러올 슬롯 번호를 입력하세요: ").strip()
@@ -1131,7 +1183,6 @@ def main():
                 invalid_input()
                 continue
 
-            # 플레이어 객체는 로드 후 세이브 데이터로 갱신됩니다.
             player = Player("loaded_player")
             if load_game_into(player, slot):
                 run_game(player)
