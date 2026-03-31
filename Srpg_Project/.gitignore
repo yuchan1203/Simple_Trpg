@@ -7,3 +7,5 @@ __pycache__/
 ## Game save files (JSON)
 saves/
 
+## Effect sound files
+effect_sound/

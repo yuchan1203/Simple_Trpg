@@ -1,22 +1,34 @@
 '''
 date: 2026-03-31
-time: AM 07:09
-version 0.0.6
+time: PM 02:44
+version 0.0.7
 developer: ruan
 description: simple text-based game with python
 '''
+
 import json
 import os
 import random
 import pygame
+import time
 from copy import deepcopy
+from datetime import datetime
 
 try:
     pygame.mixer.init()
 except pygame.error:
-    # 오디오 장치가 없어도 게임이 멈추지 않도록 합니다.
     pass
 
+class Storymanager:
+    def __init__(self, player):
+        self.player = player
+    def typewriter_print(self, text, delay=0.05):
+        for char in text:
+            print(char, end="", flush=True)
+            time.sleep(delay)
+        print()  # 줄바꿈
+    def start_prologue(self):
+        self.typewriter_print(story["prologue"])
 
 class Player:
     def __init__(self, name):
@@ -124,7 +136,7 @@ class Player:
             div = 1
         current_bar = "■" * (self.health // div)
         empty_bar = "□" * ((self.max_health - self.health) // div)
-        print(f"체력: [{self.health}/{self.max_health}] {hp_color}[{current_bar}{empty_bar}]\033[0m")
+        print(f"[체력] [{self.health}/{self.max_health}] {hp_color}[{current_bar}{empty_bar}]\033[0m")
 
     def show_experience(self):
         self.check_level_up()
@@ -139,7 +151,7 @@ class Player:
             exp_bar = f"[{'■' * (self.experience_to_next_level // div)}]"
         else:
             exp_bar = f"[{'■' * (self.experience // div)}{'□' * ((self.experience_to_next_level - self.experience) // div)}]"
-        print(f"레벨: [{self.level}] | 경험치: [{self.experience}/{self.experience_to_next_level}] {exp_bar}")
+        print(f"[LV.{self.level}] [EXP {self.experience}/{self.experience_to_next_level}] {exp_bar}")
 
     def show_status(self):
         self.show_hp()
@@ -324,6 +336,15 @@ effect_sounds = {
     "item use": "",
 }
 
+# 스토리 딕셔너리
+story = {
+    "prologue": "어느 날, 평화로운 마을에 어둠이 드리워졌습니다. 당신은 용감한 모험가로서 마을을 구하기 위해 여정을 떠납니다.",
+    "village": "마을 중심에는 상점과 주민들이 모여 있습니다. 상점에서는 다양한 아이템을 구매할 수 있고, 주민들은 유용한 정보를 제공할 수 있습니다.",
+    "forest": "숲은 위험한 몬스터들이 서식하는 곳입니다. 하지만 그곳에서만 얻을 수 있는 희귀한 자원도 존재합니다.",
+    "cave": "동굴은 어둡고 위험하지만, 강력한 몬스터와 보물이 숨겨져 있습니다. 조심해서 탐험하세요.",
+    "castle": "성은 최종 보스가 기다리는 곳입니다. 강력한 적들과의 전투를 준비하세요.",
+}
+
 EFFECT_SOUND_DIR = os.path.join(os.path.dirname(__file__), "effect_sound")
 
 
@@ -340,7 +361,6 @@ def play_effect_sound(key: str) -> None:
     try:
         pygame.mixer.Sound(sound_path).play()
     except pygame.error:
-        # 사운드 재생 오류가 나도 게임은 계속 진행
         pass
 
 store_items = {}
@@ -369,7 +389,7 @@ def save_game(player, slot: int) -> None:
 
     os.makedirs(SAVE_DIR, exist_ok=True)
     path = get_save_path(slot)
-
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     data = {
         "name": player.name,
         "max_health": player.max_health,
@@ -385,7 +405,7 @@ def save_game(player, slot: int) -> None:
         "slot_items": player.slot_items,
         "attack_buff_turns": player.attack_buff_turns,
         "attack_buff_multiplier": player.attack_buff_multiplier,
-        "saved_at": None,  # human time not required; keep file stable
+        "saved_at": now,
     }
 
     with open(path, "w", encoding="utf-8") as f:
@@ -411,7 +431,6 @@ def load_game_into(player, slot: int) -> bool:
         print("세이브 파일을 읽지 못했습니다. (파일 손상 여부 확인)")
         return False
 
-    # Player를 새로 생성하지 않고, 현재 객체를 덮어써서 run_game(player) 흐름을 유지합니다.
     player.name = data.get("name", player.name)
     player.max_health = data.get("max_health", player.max_health)
     player.health = data.get("health", player.health)
@@ -808,7 +827,7 @@ def enter_weapon_store(player):
 
 
 def enter_market(player):
-    print("[시장]", end=" ")
+    print("[시장]")
     can_sell = has_sellable_items(player)
     print("[9] [마을 중심으로 돌아가기]")
     print_divider(30)
@@ -823,7 +842,11 @@ def enter_market(player):
         print_divider(50)
         if item_choice.isdigit() and 1 <= int(item_choice) <= len(inventory_items):
             selected_item = inventory_items[int(item_choice) - 1]
-            player.sell_inventory_item(selected_item, 5, 1)
+            q = input(f"{selected_item}을(를) 몇 개 판매하시겠습니까? (최대 {player.inventory[selected_item]}개): ").strip()
+            if q.isdigit() and 1 <= int(q) <= player.inventory[selected_item]:
+                player.sell_inventory_item(selected_item, 5, int(q))
+            else:
+                print("잘못된 수량입니다.")
         elif item_choice == "9":
             print("판매를 취소했습니다.")
         else:
@@ -911,14 +934,12 @@ def run_game(player):
 
 
 def main():
+    print_divider(50)
     player_name = input("플레이어 이름을 입력하세요: ")
     player = Player(player_name)
     print_divider(50)
     if player_name == "admin":  # admin mode
-        print("관리자 모드로 진입합니다. 최대 체력을 부여합니다.")
-        player.max_health = 1000
-        player.health = 1000
-        player.experience = 50
+        print("관리자 모드로 진입합니다. 최대 코인을 부여합니다.")
         player.coins = 1000
     else:
         print(
