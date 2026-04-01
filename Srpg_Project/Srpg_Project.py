@@ -1,7 +1,7 @@
 '''
-date: 2026-03-31
-time: PM 04:53
-version 0.0.9
+date: 2026-04-02
+time: PM 02:29
+version 0.1.0
 developer: ruan
 description: simple text-based game with python
 '''
@@ -11,6 +11,7 @@ import os
 import random
 import pygame
 import time
+import sys
 from copy import deepcopy
 from datetime import datetime
 from typing import Optional, Any, Dict
@@ -19,6 +20,14 @@ try:
     pygame.mixer.init()
 except pygame.error:
     pass
+
+def resource_path(relative_path: str) -> str:
+    """PyInstaller 번들(_MEIPASS) 또는 소스 실행 시 스크립트 기준 경로."""
+    if getattr(sys, "frozen", False):
+        base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
 
 class Storymanager:
     def __init__(self, player):
@@ -358,8 +367,8 @@ story = {
     "castle": "성은 최종 보스가 기다리는 곳입니다. 강력한 적들과의 전투를 준비하세요.",
 }
 
-EFFECT_SOUND_DIR = os.path.join(os.path.dirname(__file__), "effect_sound")
-BGM_DIR = os.path.join(os.path.dirname(__file__), "bgm")
+EFFECT_SOUND_DIR = resource_path("effect_sound")
+BGM_DIR = resource_path("bgm")
 
 CURRENT_BGM_KEY: Optional[str] = None
 
